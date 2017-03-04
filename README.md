@@ -6,3 +6,14 @@ You can also load some presets that have been tested and should all work. For mo
 
 http://ionden.com/a/plugins/ion.rangeSlider/demo.html
 
+## How to use
+
+Create a text field, then enable this option on the field itself. 
+Enter your parameters for the slider, or load an example/preset.
+
+* Note: If you load a preset, the parameters are loaded to the page, but not saved until you save again. Please check the loaded parameters and adjust to your needs, and then save.
+
+Test your slider to make sure that the values are saved and read. 
+
+If you encounter any issues, please post an issue.
+
