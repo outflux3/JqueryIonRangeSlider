@@ -1,0 +1,142 @@
+<?php
+
+/**
+ * SelectizeText module for ProcessWire
+ *
+ */
+
+/**
+ * Class SelectizeText
+ */
+class JqueryIonRangeSlider extends WireData implements Module {
+
+    public static function getModuleInfo() {
+        return array(
+            'title' => 'Jquery Ion Rangeslider',
+            'author' => 'Macrura',
+            'version' => 001,
+            'summary' => 'Enables ion.RangeSlider on configured text inputs.',
+            'href' => '',
+            'icon' => 'sliders',
+            'singular' => true,
+            'autoload' => 'template=admin',
+        );
+    }
+
+    protected $jsConfig = array();
+
+    public function addProperty(HookEvent $event) {
+         $event->return = 0;
+    }
+
+    public function init() {
+
+        // set base paths and urls for scripts
+        $this->basePath = $this->config->path($this->className);
+        $this->baseUrl = $this->config->url($this->className);
+
+        $this->addHookProperty("InputfieldText::ionRangeThis", $this, "addProperty");
+        $this->addHookProperty("InputfieldText::ionParams", $this, "addProperty");
+
+        /**
+         * Adds additional options to the InputfieldText edit screen.
+         *
+         */
+        $this->addHookAfter("InputfieldText::getConfigInputfields", function($event) {
+            $that = $event->object;
+
+            // Limit only to text fields:
+            //if($that->hasFieldtype != 'FieldtypeText') return;
+
+            // Enable Selectize.js for this Field?
+            $field = $this->modules->get('InputfieldCheckbox');
+            $field->attr('name', 'ionRangeThis');
+            $field->attr('value', 1);
+            $field->label = $this->_('Enable ion.RangeSLider input for this field?');
+            $field->description = $this->_('If checked, you may setup your parameters for the plugin init.');
+            if($that->ionRangeThis) $field->attr('checked', 'checked');
+                else $field->collapsed = Inputfield::collapsedYes;
+            $event->return->append($field);
+
+            // list of selectable text strings for this Field
+            $field = $this->modules->get('InputfieldTextarea');
+            $field->setAttribute('name', 'ionParams');
+            $field->label = $this->_('Init params');
+            //$description  = $this->_('List each string, 1 per line.');
+            //$field->description = $description;
+            //$notes  = 'Example: Default News Title Format';
+            //$field->notes = $notes;
+            $field->value = trim($that->ionParams);
+            $field->showIf = 'ionRangeThis>0';
+            $event->return->append($field);
+
+        });
+
+        /**
+         * Attaches additional JS & CSS files when editing a page that
+         * uses this field/module and add the attrs to the fields.
+         *
+         */
+        $this->addHookBefore('InputfieldText::render', function($event) {
+            $that = $event->object;
+
+            // Only load additional assets if selectizeThis is enabled AND userStringsList is populated for this field
+            //  ProcessPageAdd is specified in case a Title field is Selectized.
+            if( ($that->process == 'ProcessPageEdit' || $that->process == 'ProcessPageAdd') && ($that->ionRangeThis && $that->ionParams) ) {
+
+                // Limit this to FieldtypeText (eliminates Title, Textarea and Name fields)
+                $that->config->scripts->add($this->baseUrl . 'vendor/js/ion-rangeSlider/ion.rangeSlider.min.js');
+
+                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.css');
+                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.skinHTML5.css');
+
+                $that->config->scripts->add($this->baseUrl . 'JqueryIonRangeSlider.js');
+
+                if(isset($that->ionParams) && $that->ionParams !== '') {
+
+                    //convert IonParams
+                    $params = [];
+                    $opts = explode(PHP_EOL, $that->ionParams);
+                    foreach($opts as $row) {
+                        $parts = explode(':', $row);
+                        $key = trim($parts[0]);
+                        $val = trim(rtrim($parts[1], ','));
+                        // array
+                        if(strpos($val, '[') !== false) {
+                            $valArray = [];
+                            $arrayString = trim($parts[1]);
+                            $arrayString = rtrim($arrayString,']"');
+                            $arrayString = ltrim($arrayString,'"[');
+                            $parts = explode(',', $arrayString);
+                            foreach($parts as $part) {
+                                $val = str_replace('"', "", $part);
+                                $val = trim($val);
+                                $valArray[] = $val;
+                            }
+
+                            $val = $valArray;
+                        }
+                        $val = str_replace('"', "", $val);
+                        $params[$key] = $val;
+                    }
+
+                    // Add atts to the field
+                    //$data_data = json_encode($stringsArray);
+                   // $that->attr('data-data', $data_data);
+                    $that->attr('data-enableionrange', 1);
+                    //$this->jsConfig[$that->id] = $that->ionParams;
+                    //$this->jsConfig[$that->id]['options'] = $params;
+                    $this->jsConfig[$that->id] = $params;
+                    $this->config->js(__CLASS__, $this->jsConfig);
+
+                }
+
+            }
+
+        }); // end add hook
+
+
+    } //end init()
+
+
+} // end class

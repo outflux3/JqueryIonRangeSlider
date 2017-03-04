@@ -1,0 +1,380 @@
+<?php
+
+/**
+ * JqueryIonRangeSlider module for ProcessWire
+ *
+ */
+
+
+/**
+ * Class JqueryIonRangeSlider
+ */
+
+class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModule {
+
+    public static function getModuleInfo() {
+        return array(
+            'title' => 'Jquery Ion Rangeslider',
+            'author' => 'Macrura',
+            'version' => 001,
+            'summary' => 'Enables ion.RangeSlider on configured text inputs.',
+            'href' => 'https://processwire.com/talk/topic/15649-jqueryionrangeslider-pre-release/',
+            'icon' => 'sliders',
+            'singular' => true,
+            'autoload' => 'template=admin',
+        );
+    }
+
+
+    //---------------BEGIN MODULE CONFIGURATION STUFF-------------------------
+
+    /**
+     * New Method of defining layout settings
+     * @var array
+     */
+    protected static $configDefaults = array(
+        'ionSkin'     => 'skinHTML5',
+    );
+
+    /**
+     * Data as used by the get/set functions
+     *
+     */
+    protected $data = array();
+
+
+    /**
+     * Set our configuration defaults
+     *
+     */
+    public function __construct() {
+        foreach(self::$configDefaults as $key => $value) {
+            $this->set($key, $value); 
+        }
+    }
+
+    /**
+     * Module configuration screen
+     *
+     */
+    public static function getModuleConfigInputfields(array $data) {
+
+        foreach(self::$configDefaults as $key => $value) {
+            if(!isset($data[$key])||$data[$key]=="") $data[$key] = $value;
+        }
+
+        unset($data['cacheClear']);
+        $inputfields = new InputfieldWrapper();
+
+
+        /* INSTRUCTIONS
+        ------------------------------------------------------------------------ */
+        $f = wire('modules')->get('InputfieldMarkup');
+        $f->name  = 'instructions';
+        $f->label = __('Instructions', __FILE__);
+        $f->markupText = __('You can set the global skin here. To configure any slider, enable the slider on the text field itself.', __FILE__);
+        $inputfields->add($f); 
+
+        /* SKIN
+        ------------------------------------------------------------------------ */
+        $f = wire('modules')->get('InputfieldSelect'); 
+        $f->attr('name', __('ionSkin'));
+        $f->addOption(__('skinHTML5'),'HTML5 Skin', ($data['ionSkin']== 'skinHTML5')?array('selected'=>'selected'):null);
+        $f->addOption(__('skinFlat'),'Flat UI', ($data['ionSkin']=='skinFlat')?array('selected'=>'selected'):null);
+        $f->addOption(__('skinModern'),'Modern', ($data['ionSkin']=='skinModern')?array('selected'=>'selected'):null);
+        $f->addOption(__('skinNice'),'Nice White', ($data['ionSkin']=='skinNice')?array('selected'=>'selected'):null);
+        $f->addOption(__('skinSimple'),'Simple Dark', ($data['ionSkin']=='skinSimple')?array('selected'=>'selected'):null);
+        $f->label = __('Default Slider Skin'); 
+        $f->notes = __('can be overriden per instance.');
+        //$f->columnWidth = 33;
+        $inputfields->add($f); 
+        //$fset->add($f);
+
+
+        // ------------------------------------------------------------------------
+        return $inputfields;
+    }
+
+
+
+    //---------------END CONFIGURATION STUFF-------------------------
+
+
+    protected $jsConfig = array();
+
+    public function addProperty(HookEvent $event) {
+         $event->return = 0;
+    }
+
+    public function init() {
+
+        // set base paths and urls for scripts
+        $this->baseUrl   = $this->config->urls->JqueryIonRangeSlider;
+        $this->basePath  = $this->config->paths->JqueryIonRangeSlider;
+
+        $this->addHookProperty("InputfieldText::ionRangeThis", $this, "addProperty");
+        $this->addHookProperty("InputfieldText::ionParams", $this, "addProperty");
+        $this->addHookProperty("InputfieldText::ionSkin", $this, "addProperty");
+        $this->addHookProperty("InputfieldText::loadParams", $this, "addProperty");
+
+        /**
+         * Adds additional options to the InputfieldText edit screen.
+         *
+         */
+        $this->addHookAfter("InputfieldText::getConfigInputfields", function($event) {
+            $that = $event->object;
+
+            // Limit only to text fields:
+            //if($that->hasFieldtype != 'FieldtypeText') return;
+
+            // Enable ion.Rangeslider for this Field?
+            $f = $this->modules->get('InputfieldCheckbox');
+            $f->attr('name', 'ionRangeThis');
+            $f->attr('value', 1);
+            $f->label = $this->_('Enable ion.RangeSlider input for this field?');
+            $f->description = $this->_('If checked, you may setup your parameters for the plugin init.');
+            if($that->ionRangeThis) $f->attr('checked', 'checked');
+                else $f->collapsed = Inputfield::collapsedYes;
+            $event->return->append($f);
+
+            // list of selectable text strings for this Field
+            $useAce = $this->modules->get('InputfieldAceExtended') ? true : false;
+            if($useAce) {
+                $f = wire('modules')->get('InputfieldAceExtended');
+                $f->mode = "php";
+                $f->theme = "monokai";
+            } else {
+                $f = $this->modules->get('InputfieldTextarea');
+            }
+            //$f = $this->modules->get('InputfieldTextarea');
+            $f->setAttribute('name', 'ionParams');
+            $f->label = $this->_('Init params');
+            $f->description = $this->_('Place the slider init params here. See [http://ionden.com/a/plugins/ion.rangeSlider/demo.html](http://ionden.com/a/plugins/ion.rangeSlider/demo.html)');
+            //$f->value = trim($that->ionParams);
+            //$methodName = $that->loadParams; //$this->$methodName()
+            $f->value = $that->loadParams && $that->ionParams == '' ? $this->{$that->loadParams}() : trim($that->ionParams);
+            $f->showIf = 'ionRangeThis>0';
+            $f->columnWidth = 100;
+            $event->return->append($f);
+
+            $f = $this->modules->get('InputfieldSelect'); 
+            $f->attr('name', __('ionSkin'));
+            $f->addOption(__('skinHTML5'),'HTML5 Skin', (isset($that->ionSkin) && $that->ionSkin == 'skinHTML5')?array('selected'=>'selected'):null);
+            $f->addOption(__('skinFlat'),'Flat UI', (isset($that->ionSkin) && $that->ionSkin=='skinFlat')?array('selected'=>'selected'):null);
+            $f->addOption(__('skinModern'),'Modern', (isset($that->ionSkin) && $that->ionSkin=='skinModern')?array('selected'=>'selected'):null);
+            $f->addOption(__('skinNice'),'Nice White', (isset($that->ionSkin) && $that->ionSkin=='skinNice')?array('selected'=>'selected'):null);
+            $f->addOption(__('skinSimple'),'Simple Dark', (isset($that->ionSkin) && $that->ionSkin=='skinSimple')?array('selected'=>'selected'):null);
+            $f->label = __('Slider Skin'); 
+            $f->notes = __('This will affect only this slider.');
+            $f->showIf = 'ionRangeThis>0';
+            $f->value = isset($that->ionSkin) ? $that->ionSkin : '';
+            $f->columnWidth = 50;
+            $f->collapsed = Inputfield::collapsedBlank;
+            $event->return->append($f);
+
+            //----- experimental - loading presets
+            $f = $this->modules->get('InputfieldSelect'); 
+            $f->attr('name', __('loadParams'));
+            $f->addOption(__('singleSlider'),'Single Slider', (isset($that->loadParams) && $that->loadParams=='singleSlider')?array('selected'=>'selected'):null);
+            $f->addOption(__('doubleSlider'),'Double Slider', (isset($that->loadParams) && $that->loadParams=='doubleSlider')?array('selected'=>'selected'):null);
+            $f->addOption(__('moneySlider'),'Money Slider', (isset($that->loadParams) && $that->loadParams=='moneySlider')?array('selected'=>'selected'):null);
+            $f->addOption(__('tempSlider'),'Temperature Slider', (isset($that->loadParams) && $that->loadParams=='tempSlider')?array('selected'=>'selected'):null);
+            $f->addOption(__('yearsSlider'),'Years Slider', (isset($that->loadParams) && $that->loadParams=='yearsSlider')?array('selected'=>'selected'):null);
+
+            $f->addOption(__('monthsSlider'),'Months Example', (isset($that->loadParams) && $that->loadParams=='monthsSlider')?array('selected'=>'selected'):null);
+            $f->addOption(__('numberNames'),'Number Names Example', (isset($that->loadParams) && $that->loadParams=='numberNames')?array('selected'=>'selected'):null);
+            $f->addOption(__('fixedNumbers'),'Fixed Numbers Example', (isset($that->loadParams) && $that->loadParams=='fixedNumbers')?array('selected'=>'selected'):null);
+            $f->addOption(__('dragInterval'),'Drag Interval Example', (isset($that->loadParams) && $that->loadParams=='dragInterval')?array('selected'=>'selected'):null);
+
+            $f->label = __('Load Params');
+            $f->description = $this->_('To load preset, clear the existing params and select a preset, then hit save.');
+            $f->notes = $this->_('Once you load new params, you must save again to commit them to the database.');
+            $f->showIf = 'ionRangeThis>0';
+            $f->value = isset($that->loadParams) ? $that->loadParams : '';
+            $f->columnWidth = 50;
+            $f->collapsed = Inputfield::collapsedYes;
+            $event->return->append($f);
+
+
+        });
+
+        /**
+         * Attaches additional JS & CSS files when editing a page that
+         * uses this field/module and add the attrs to the fields.
+         *
+         */
+        $this->addHookBefore('InputfieldText::render', function($event) {
+            $that = $event->object;
+
+            // Only load additional assets if selectizeThis is enabled AND userStringsList is populated for this field
+            //  ProcessPageAdd is specified in case a Title field is Selectized.
+            if( ($that->process == 'ProcessPageEdit' || $that->process == 'ProcessPageAdd') && ($that->ionRangeThis && $that->ionParams) ) {
+
+                // Limit this to FieldtypeText (eliminates Title, Textarea and Name fields)
+                $that->config->scripts->add($this->baseUrl . 'vendor/js/ion-rangeSlider/ion.rangeSlider.min.js');
+                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.css');
+
+                // Skin
+                if($that->ionSkin) {
+                    $skin = $that->ionSkin;
+                } else {
+                    $skin = $this->ionSkin;
+                }
+
+                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.'.$skin.'.css');
+                $that->config->scripts->add($this->baseUrl . 'JqueryIonRangeSlider.js');
+
+                if(isset($that->ionParams) && $that->ionParams !== '') {
+                    $that->attr('data-enableionrange', 1);
+                    $this->jsConfig[$that->id] = $that->ionParams;
+                    if(strpos($that->ionParams, 'type: "double"') !== false || strpos($that->ionParams, 'type:"double"') !== false) {
+                        $that->attr('data-isrange', 1);
+                    }
+                    $this->config->js(__CLASS__, $this->jsConfig);
+                }
+
+            }
+
+        }); // end add hook
+
+
+    } //end init()
+
+    function removeWhiteSpace($text) {
+        return str_replace('  ','',$text);
+    }
+
+    private function singleSlider() {
+        $out = '
+            type: "single",
+            min: 0,
+            max: 100,
+            force_edges: true,
+        ';
+
+        return $this->removeWhiteSpace($out);
+
+    }
+
+    private function doubleSlider() {
+        $out = '
+            type: "double",
+            min: 0,
+            max: 100,
+            force_edges: true,
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+
+    private function moneySlider() {
+        $out = '
+            type: "double",
+            grid: true,
+            min: 0,
+            max: 1000,
+            from: 1000,
+            step: 100,
+            prefix: "$",
+            force_edges: true,
+            prettify_enabled: false
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+    private function tempSlider() {
+        $out = '
+            type: "single",
+            grid: true,
+            min: -90,
+            max: 90,
+            from: 0,
+            postfix: "°"
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+    private function yearsSlider() {
+        $out = '
+            type: "double",
+            min: 1970,
+            max: 2020,
+            grid: true,
+            grid_num: 10,
+            prettify_enabled: false
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+
+    private function ageSlider() {
+        $out = '
+            grid: true,
+            min: 18,
+            max: 70,
+            from: 30,
+            prefix: "Age ",
+            max_postfix: "+"
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+    private function monthsSlider() {
+        $out = '
+            grid: true,
+            from: 3,
+            values: [
+                "January", "February", "March",
+                "April", "May", "June",
+                "July", "August", "September",
+                "October", "November", "December"
+            ],
+            force_edges: true
+         ';
+        return $this->removeWhiteSpace($out);
+    }
+
+    private function numberNames() {
+        $out = '
+            grid: true,
+            from: 5,
+            values: [
+                "zero", "one",
+                "two", "three",
+                "four", "five",
+                "six", "seven",
+                "eight", "nine",
+                "ten"
+            ]';
+        return $this->removeWhiteSpace($out);
+    }
+
+    private function fixedNumbers() {
+        $out = '
+            type: "double",
+            grid: true,
+            from: 1,
+            to: 5,
+            values: [0, 10, 100, 1000, 10000, 100000, 1000000],
+            prettify_enabled: true,
+            prettify_separator: ","
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+
+    private function dragInterval() {
+        $out = '
+            type: "double",
+            min: 0,
+            max: 100,
+            from: 30,
+            to: 70,
+            drag_interval: true
+        ';
+        return $this->removeWhiteSpace($out);
+    }
+
+
+
+} // end class
