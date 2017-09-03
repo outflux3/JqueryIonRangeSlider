@@ -16,7 +16,7 @@ class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModul
         return array(
             'title' => 'Jquery Ion Rangeslider',
             'author' => 'Macrura',
-            'version' => 001,
+            'version' => 003,
             'summary' => 'Enables ion.RangeSlider on configured text inputs.',
             'href' => 'https://processwire.com/talk/topic/15649-jqueryionrangeslider-pre-release/',
             'icon' => 'sliders',
@@ -106,6 +106,10 @@ class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModul
          $event->return = 0;
     }
 
+    public function addBlankProperty(HookEvent $event) {
+         $event->return = '';
+    }
+
     public function init() {
 
         // set base paths and urls for scripts
@@ -113,7 +117,7 @@ class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModul
         $this->basePath  = $this->config->paths->JqueryIonRangeSlider;
 
         $this->addHookProperty("InputfieldText::ionRangeThis", $this, "addProperty");
-        $this->addHookProperty("InputfieldText::ionParams", $this, "addProperty");
+        $this->addHookProperty("InputfieldText::ionParams", $this, "addBlankProperty");
         $this->addHookProperty("InputfieldText::ionSkin", $this, "addProperty");
         $this->addHookProperty("InputfieldText::loadParams", $this, "addProperty");
 
