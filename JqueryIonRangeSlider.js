@@ -6,16 +6,17 @@ function strpos (haystack, needle, offset) {
 
 
 $(document).ready(function() {
+
 	$(".InputfieldText input[data-enableionrange=1]").each(function() {
 		initIonRange($(this));
-	}); 
-	$(document).on('reloaded opened repeateradd wiretabclick', '.InputfieldText', function() {
+	});
 
+	$(document).on('reloaded opened repeateradd wiretabclick', '.InputfieldText', function() {
 		$(this).find("input[data-enableionrange=1]").each(function() {
 			initIonRange($(this));
 		});
 	});
-}); 
+});
 
 
 var initIonRange = function($textField) {

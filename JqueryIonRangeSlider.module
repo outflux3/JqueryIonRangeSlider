@@ -16,7 +16,7 @@ class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModul
         return array(
             'title' => 'Jquery Ion Rangeslider',
             'author' => 'Macrura',
-            'version' => 003,
+            'version' => 004,
             'summary' => 'Enables ion.RangeSlider on configured text inputs.',
             'href' => 'https://processwire.com/talk/topic/15649-jqueryionrangeslider-pre-release/',
             'icon' => 'sliders',
@@ -202,47 +202,44 @@ class JqueryIonRangeSlider extends WireData implements Module, ConfigurableModul
 
         });
 
-        /**
-         * Attaches additional JS & CSS files when editing a page that
-         * uses this field/module and add the attrs to the fields.
-         *
-         */
-        $this->addHookBefore('InputfieldText::render', function($event) {
-            $that = $event->object;
-
-            // Only load additional assets if selectizeThis is enabled AND userStringsList is populated for this field
-            //  ProcessPageAdd is specified in case a Title field is Selectized.
-            if( ($that->process == 'ProcessPageEdit' || $that->process == 'ProcessPageAdd') && ($that->ionRangeThis && $that->ionParams) ) {
-
-                // Limit this to FieldtypeText (eliminates Title, Textarea and Name fields)
-                $that->config->scripts->add($this->baseUrl . 'vendor/js/ion-rangeSlider/ion.rangeSlider.min.js');
-                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.css');
-
-                // Skin
-                if($that->ionSkin) {
-                    $skin = $that->ionSkin;
-                } else {
-                    $skin = $this->ionSkin;
-                }
-
-                $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.'.$skin.'.css');
-                $that->config->scripts->add($this->baseUrl . 'JqueryIonRangeSlider.js');
-
-                if(isset($that->ionParams) && $that->ionParams !== '') {
-                    $that->attr('data-enableionrange', 1);
-                    $this->jsConfig[$that->id] = $that->ionParams;
-                    if(strpos($that->ionParams, 'type: "double"') !== false || strpos($that->ionParams, 'type:"double"') !== false) {
-                        $that->attr('data-isrange', 1);
-                    }
-                    $this->config->js(__CLASS__, $this->jsConfig);
-                }
-
-            }
-
-        }); // end add hook
+        $this->addHookBefore('InputfieldText::renderReadyHook', $this, 'initIonRange');
 
 
     } //end init()
+
+
+    public function initIonRange($event) {
+        $that = $event->object;
+
+        if($that->ionRangeThis && $that->ionParams) {
+
+            // Limit this to FieldtypeText (eliminates Title, Textarea and Name fields)
+            $that->config->scripts->add($this->baseUrl . 'vendor/js/ion-rangeSlider/ion.rangeSlider.min.js');
+            $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.css');
+
+            // Skin
+            if($that->ionSkin) {
+                $skin = $that->ionSkin;
+            } else {
+                $skin = $this->ionSkin;
+            }
+
+            $that->config->styles->add($this->baseUrl . 'vendor/css/ion.rangeSlider.'.$skin.'.css');
+            $that->config->scripts->add($this->baseUrl . 'JqueryIonRangeSlider.js');
+
+            if(isset($that->ionParams) && $that->ionParams !== '') {
+                $that->attr('data-enableionrange', 1);
+                $this->jsConfig[$that->id] = $that->ionParams;
+                if(strpos($that->ionParams, 'type: "double"') !== false || strpos($that->ionParams, 'type:"double"') !== false) {
+                    $that->attr('data-isrange', 1);
+                }
+                $this->config->js(__CLASS__, $this->jsConfig);
+            }
+
+        }
+
+    }
+
 
     function removeWhiteSpace($text) {
         return str_replace('  ','',$text);
